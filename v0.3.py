@@ -267,7 +267,7 @@ class cover():
                 self.new_temp = self.next_ring.last_temp
 
     def update_temp(self):
-        self.last_temp = self.new_temp
+        self.temp = self.last_temp = self.new_temp
         return self.last_temp
 
     def __str__(self):
@@ -295,12 +295,14 @@ class mesh():
             r = ring(inputs, l, L)
             r.previus_ring = prev_ring
             self.rings.append(r)
+            prev_ring = r
             l += L
 
         # liga os vizinhos "next"
         next_ring = self.rings[-1]
         for r in reversed(self.rings):
             r.next_ring = next_ring
+            next_ring = r        
 
         # liga a calota ao primeiro anel
         self.cover.next_ring = self.rings[0]
