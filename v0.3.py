@@ -23,7 +23,7 @@
 # Bugs:
 #  - A os pontos e a normal está calculada nas coordenadas do elipsoide
 
-import math
+import math, sys
 
 # Carrega o módulo 3D caso o módulo vtk estaja disponível
 # no ubuntu: # apt-get install python-vtk
@@ -71,7 +71,13 @@ class tile():
         self.normal = tuple([p[1]*q[2] - p[2]*q[1],
                              p[2]*q[0] - p[0]*q[2],
                              p[0]*q[1] - p[1]*q[0]])
+        
+        modnormal = math.sqrt(self.normal[0]**2 + self.normal[1]**2 + self.normal[2]**2)
+        if (modnormal < 1e-15):
+          sys.exit("Erro ao calcular o vetor normal")
 
+        self.normal = tuple([self.normal[0]/modnormal, self.normal[1]/modnormal, self.normal[2]/modnormal])
+  
         # salva o parent para pedir a temperatura dos vizinhos
         self.parent = parent
 
@@ -235,8 +241,10 @@ class cover():
 
         self.bursted = False # True quando a pastilha estourou quando estourou
 
-        # a normal é o inverso do vetor posição (certo?)
-        self.normal = tuple(map(lambda x: -x, inputs["pos"]))
+        # Gabriel: a normal é o inverso do vetor posição (certo?)
+        # Max: Estamos considerando que a normal está na mesma direção e sentindo do vetor posição
+        #self.normal = tuple(map(lambda x: -x, inputs["pos"]))
+        self.normal = inputs["pos"]
 
         # primeiro anel
         self.next_ring = False
@@ -407,6 +415,65 @@ def render(mesh, inputs):
     renWin.Render()
     iren.Start()
 
+# rotaciona sistema
+def rotate_system(inputs):
+    pos = list(inputs["pos"])
+    vel = list(inputs["vel"])
+
+    modpos = math.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
+  
+    if (modpos < 1e-15):
+      sys.exit("Vetor inválido")
+  
+    pos = [pos[0]/modpos, pos[1]/modpos, pos[2]/modpos]
+
+    if (pos[0] == 0):
+      alpha = math.pi / 2.0
+    else:
+      alpha = (-1) * math.atan( pos[1] / pos[0] )
+    
+ 
+    x_linha = vel[0] * math.cos(alpha) - vel[1] * math.sin(alpha)
+    y_linha = vel[0] * math.sin(alpha) + vel[1] * math.cos(alpha)
+ 
+    vel[0] = x_linha
+    vel[0] = y_linha    
+
+    # rotação da posição
+    # rotacao em relacao ao eixo z
+    x_linha = pos[0] * math.cos(alpha) - pos[1] * math.sin(alpha)
+    y_linha = pos[0] * math.sin(alpha) + pos[1] * math.cos(alpha)
+ 
+    pos[0] = x_linha
+    pos[1] = y_linha
+ 
+    # rotacao em relacao ao eixo x (a fim de zerar y)
+    if (pos[2] == 0):
+       beta = math.pi / 2.0
+    else:
+       beta = (-1) * math.atan( pos[0] / pos[2])
+  
+    x_linha = vel[2] * math.sin(beta) + vel[0] * math.cos(beta)
+    z_linha = vel[2] * math.cos(beta) - vel[0] * math.sin(beta) 
+       
+    vel[0] = x_linha
+    vel[2] = z_linha
+ 
+    # rotacao em relacao ao eixo x
+    x_linha = pos[2] * math.sin(beta) + pos[0] * math.cos(beta)
+    z_linha = pos[2] * math.cos(beta) - pos[0] * math.sin(beta) 
+       
+    pos[0] = x_linha
+    pos[2] = z_linha
+
+    if (pos[2] > 0.):
+      pos = (-pos[0], -pos[1], -pos[2])
+      vel = (-vel[0], -vel[1], -vel[2])
+ 
+    inputs["pos"] = (pos[0], pos[1], pos[2])
+    inputs["vel"] = (vel[0], vel[1], vel[2])
+
+# Estamos considerando que o vetor posição está saindo da cápsula e não entrando
 def parse_input():
     # Não está lendo o do arquivo!
     i = {}
@@ -419,9 +486,17 @@ def parse_input():
     i["t_inicial"] = 0
     i["theta_crit"] = 1050 #?
     i["theta_0"] = 1000.0
-    i["pos"] = (1.0, 1.0, 1.0)
-    i["vel"] = (1.0, 1.0, 1.0)
-    i["steps"] = 20
+    i["pos"] = (0.0, 0.0, -1.0)
+    i["vel"] = (1.0, 1.0, 1.)
+    i["steps"] = 1000
+
+    rotate_system(i)
+
+    #print "pos' = %.2f %.2f %.2f" % i["pos"]
+    #print "vel' = %.2f %.2f %.2f" % i["vel"]
+
+    #sys.exit("OK")
+
     return i
 
 if __name__ == "__main__":
